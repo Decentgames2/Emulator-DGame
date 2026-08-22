@@ -20,15 +20,12 @@
         align-items: center;
     }
 
-    /*
-       【关键 CSS】
-       打破传统 image-rendering: pixelated; 带来的硬方块马赛克！
-       使用高保真平滑拉伸，配合硬件 GPU 上采样
-    */
+    /* 强制重写 Canvas 样式，消除锯齿方块 */
     canvas {
-        image-rendering: -webkit-optimize-contrast;
         image-rendering: auto !important;
-        transform: translateZ(0); /* 开启 GPU 硬件加速图层 */
+        image-rendering: smooth !important;
+        image-rendering: high-quality !important;
+        transform: translateZ(0);
     }
     </style>
 </head>
@@ -45,12 +42,6 @@
             type = type.split('?')[0];
         }
 
-        window.EJS_DEBUG_XX = false;
-        window.EJS_player = '#game';
-        window.EJS_pathtodata = './ems/data/';
-        window.EJS_language = 'en-US';
-        window.EJS_disableLocalStorage = true;
-
         const coreMap = {
             'ps1': 'pcsx_rearmed', 'playstation': 'pcsx_rearmed',
             'nes': 'fceumm', 'snes': 'snes9x',
@@ -64,40 +55,44 @@
 
         const folderMap = { 'mame': 'fbneo', 'ps1': 'playstation', 'playstation': 'playstation' };
         const coreType = type ? type.toLowerCase() : '';
+
+        // --- 全局根配置打平绑定 ---
+        window.EJS_player = '#game';
+        window.EJS_pathtodata = './ems/data/';
+        window.EJS_language = 'en-US';
         window.EJS_core = coreMap[coreType] || coreType;
+        window.EJS_disableLocalStorage = true; // 清除错乱的缓存
 
         if (game && type) {
             const folderName = folderMap[coreType] || coreType;
             window.EJS_gameUrl = `./roms/${folderName}/${game}`;
         }
 
-        // 默认全局设置
-        window.EJS_settings = {
-            "corePath": "./ems/data/cores/",
-            "memorySize": 512,
-            "initialMemorySize": 256,
-            "frameRate": 60,
-            "fastForward": true,
-            "slowMotion": false,
-            "rewindEnabled": "enabled",
-            "cheatsEnabled": false,
-            "videoSmooth": true,             // 开启全局平滑插值
-            "webgl2Enabled": "enabled",      // 开启 WebGL 2.0
-            "shader": "sharp"                // 使用 EmulatorJS 内置的通用 Sharp 锐化处理
-        };
-
+        // BIOS 自动匹配
         if (coreType === 'mame' || coreType === 'fbneo' || coreType === 'arcade' || coreType === 'neogeo') {
-            window.EJS_settings = {
-                ...window.EJS_settings,
-                "fbneo-neogeo-mode": "UNIBIOS",
-                "fbneo-cpu-speed-adjust": 100,
-                "fbneo-frameskip": 0,
-                "fbneo-interpolation": 2     // 让 FBNeo 核心以最高等级（2x）放大原图
-            };
-
             window.EJS_biosUrl = "./bios/neogeo.zip";
             if (game && game.includes('mslug6')) window.EJS_biosUrl = "./bios/awbios.zip";
         }
+
+        // --- 强制插值与硬件平滑设置 (正确写法) ---
+        window.EJS_videoSmooth = true; // 强制开启视频平滑插值
+        window.EJS_threads = true;     // 开启多线程运算加速渲染
+
+        // 监听渲染完成，强制修改 WebGL 上下文平滑度
+        window.EJS_onGameStart = function() {
+            setTimeout(() => {
+                const canvas = document.querySelector('canvas');
+                if (canvas) {
+                    canvas.style.setProperty('image-rendering', 'smooth', 'important');
+                    canvas.style.setProperty('image-rendering', 'auto', 'important');
+                    const ctx = canvas.getContext('2d') || canvas.getContext('webgl') || canvas.getContext('webgl2');
+                    if (ctx && ctx.imageSmoothingEnabled !== undefined) {
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+                    }
+                }
+            }, 500);
+        };
     </script>
     <script src="./ems/data/loader.js"></script>
 </body>
