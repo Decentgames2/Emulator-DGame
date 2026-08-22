@@ -20,18 +20,9 @@
         justify-content: center;
         align-items: center;
     }
-
-    /*
-       【关键滤镜组合】
-       1. contrast(105%) & saturate(110%): 提升街机基板对比度与色彩饱和度
-       2. contrast / image-rendering 组合：利用 WebGL 硬件图层在拉伸时进行锐化，去除马赛克
-    */
     canvas {
         image-rendering: auto !important;
-        image-rendering: -webkit-optimize-contrast !important;
-        filter: contrast(1.08) saturate(1.1) drop-shadow(0 0 1px rgba(0,0,0,0.5));
         transform: translateZ(0);
-        will-change: transform;
     }
     </style>
 </head>
@@ -62,7 +53,7 @@
         const folderMap = { 'mame': 'fbneo', 'ps1': 'playstation', 'playstation': 'playstation' };
         const coreType = type ? type.toLowerCase() : '';
 
-        // 全局基础配置
+        // 1. 全局配置
         window.EJS_player = '#game';
         window.EJS_pathtodata = './ems/data/';
         window.EJS_language = 'en-US';
@@ -74,30 +65,19 @@
             window.EJS_gameUrl = `./roms/${folderName}/${game}`;
         }
 
-        // BIOS 路径
+        // BIOS 配置
         if (coreType === 'mame' || coreType === 'fbneo' || coreType === 'arcade' || coreType === 'neogeo') {
             window.EJS_biosUrl = "./bios/neogeo.zip";
             if (game && game.includes('mslug6')) window.EJS_biosUrl = "./bios/awbios.zip";
         }
 
-        // 线程与平滑设置
+        // 2. 线程与 WebGL 设置
         window.EJS_threads = !!window.crossOriginIsolated;
-        window.EJS_videoSmooth = true; // 配合 CSS 优化滤镜开启
+        window.EJS_videoSmooth = false;
 
-        // 监听游戏渲染，强行注入高品质平滑上下文
-        window.EJS_onGameStart = function() {
-            const checkCanvas = setInterval(() => {
-                const canvas = document.querySelector('canvas');
-                if (canvas) {
-                    clearInterval(checkCanvas);
-                    // 强制 WebGL 2D 上下文开启高品质双线性插值
-                    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-                    if (gl) {
-                        gl.hint(gl.GENERATE_MIPMAP_HINT, gl.NICEST);
-                    }
-                }
-            }, 100);
-        };
+        // 3. 【核心修正】放弃 .glslp，直接将路径指向单个 .glsl 源文件
+        // 请确认你的 xbrz 文件夹内是否有 xbrz-freescale.glsl (或 2xbrz.glsl, 4xbrz.glsl)
+        window.EJS_gameShader = "glsl-shaders-master/xbrz/shaders/xbrz-freescale.glsl";
     </script>
     <script src="./ems/data/loader.js"></script>
 </body>
