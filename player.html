@@ -6,6 +6,13 @@
     <style>
     body,html{margin:0;padding:0;width:100%;height:100%;background: #000000}
     #game-container {width:100vw;height:100vh;}
+    /* 锐利像素风：最近邻放大，保持像素点绝对锐利（保留） */
+    canvas {
+        image-rendering: -moz-crisp-edges !important;
+        image-rendering: -webkit-optimize-contrast !important;
+        image-rendering: pixelated !important;
+        image-rendering: crisp-edges !important;
+    }
     </style>
 </head>
 <body>
@@ -65,32 +72,18 @@
 
         window.EJS_language = 'en-US';
 
-        // --- 核心路径配置 ---
-        window.EJS_settings = {
-            "corePath": "./ems/data/cores/",
-            "memorySize": 512,
-            "frameRate": 70,
-            "fastForward": true,
-            "slowMotion": false,
-            "rewindEnabled": "enabled",
-            "cheatsEnabled": false,
-            "videoSmooth": true,
-            "videoFilter": "none",
-            "internalResolution": 1,
-            "initialMemorySize": 256,
-            "autoFrameSkip": true,
-            "frameSkip": 0
+        // 本版本只认 EJS_defaultOptions（window.EJS_settings 不会被读取）
+        window.EJS_defaultOptions = {
+            "webgl2Enabled": "disabled"
         };
 
         if (coreType === 'ps1' || coreType === 'playstation') {
             window.EJS_biosUrl = "./bios/scph5502.bin";
 
-            window.EJS_settings = {
-                ...window.EJS_settings,
+            window.EJS_defaultOptions = {
+                ...window.EJS_defaultOptions,
                 "pcsx_rearmed_gpu": "gpu_unai",
-                "pcsx_rearmed_resolution": 2,
                 "pcsx_rearmed_dithering": "disabled",
-                "initialMemorySize": 128,
                 "pcsx_rearmed_frameskip": 0
             };
 
@@ -111,19 +104,18 @@
         else if (coreType === 'gba') {
             window.EJS_biosUrl = "./bios/gba_bios.bin";
 
-            window.EJS_settings = {
-                ...window.EJS_settings,
+            window.EJS_defaultOptions = {
+                ...window.EJS_defaultOptions,
                 "mgba_interframe_blending": false,
                 "mgba_video_color_correction": "enabled",
-                "mgba_lcd_ghosting": "disabled",
-                "mgba_fps": 60
+                "mgba_lcd_ghosting": "disabled"
             };
         }
         else if (coreType === 'gb' || coreType === 'gbc') {
             window.EJS_biosUrl = "./bios/gbc_bios.bin";
 
-            window.EJS_settings = {
-                ...window.EJS_settings,
+            window.EJS_defaultOptions = {
+                ...window.EJS_defaultOptions,
                 "gambatte_gb_internal_palette": "optimized",
                 "gambatte_mix_frames": "disabled"
             };
@@ -137,8 +129,8 @@
         else if (coreType === 'nds') {
             window.EJS_biosUrl = "./bios/bios7.bin";
 
-            window.EJS_settings = {
-                ...window.EJS_settings,
+            window.EJS_defaultOptions = {
+                ...window.EJS_defaultOptions,
                 "initialMemorySize": 128,
                 "melonds_fps": 60
             };
@@ -175,10 +167,8 @@
         }
 
         if (coreType === 'mame' || coreType === 'fbneo' || coreType === 'arcade' || coreType === 'neogeo') {
-            window.EJS_settings = {
-                ...window.EJS_settings,
-                "webgl2Enabled": "enabled",
-                "videoSmooth": true,
+            window.EJS_defaultOptions = {
+                ...window.EJS_defaultOptions,
                 "fbneo-neogeo-mode": "UNIBIOS",
                 "fbneo-cpu-speed-adjust": 100,
                 "fbneo-frameskip": 0,
