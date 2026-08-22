@@ -16,10 +16,8 @@
         width: 100vw;
         height: 100vh;
     }
-    /* 强制使用浏览器标准双线性平滑，禁止硬拉马赛克 */
     canvas {
         image-rendering: auto !important;
-        image-rendering: bilinear !important;
     }
     </style>
 </head>
@@ -28,7 +26,6 @@
         <div id="game"></div>
     </div>
     <script>
-        // 1. 解析 URL 参数
         const urlParams = new URLSearchParams(window.location.search);
         const game = urlParams.get('game');
         let type = urlParams.get('type');
@@ -37,16 +34,12 @@
             type = type.split('?')[0];
         }
 
-        // 2. 基础全局环境变量
         window.EJS_DEBUG_XX = false;
         window.EJS_player = '#game';
         window.EJS_pathtodata = './ems/data/';
         window.EJS_language = 'en-US';
-
-        // 强制禁用本地存储，防止旧配置死灰复燃
         window.EJS_disableLocalStorage = true;
 
-        // 3. 平台核心与路径映射表
         const coreMap = {
             'ps1': 'pcsx_rearmed',
             'playstation': 'pcsx_rearmed',
@@ -80,124 +73,37 @@
         if (game && type) {
             const folderName = folderMap[coreType] || coreType;
             window.EJS_gameUrl = `./roms/${folderName}/${game}`;
-            console.log('Game URL:', window.EJS_gameUrl);
         }
 
-        // 4. 基础运行环境参数定义
-        let settingsConfig = {
+        // --- 核心优化参数设置 ---
+        window.EJS_settings = {
             "corePath": "./ems/data/cores/",
-            "memorySize": 512,            // 允许最大的内存
-            "initialMemorySize": 256,     // 预加载堆内存为 256MB，防止警告和软渲染回退
+            "memorySize": 512,
+            "initialMemorySize": 256,
             "frameRate": 60,
             "fastForward": true,
             "slowMotion": false,
             "rewindEnabled": "enabled",
             "cheatsEnabled": false,
-            "videoSmooth": true,           // 开启平滑过滤
-            "autoFrameSkip": true,
-            "frameSkip": 0,
-            "webgl2Enabled": "enabled",    // 强制开启 WebGL 2.0 硬件加速
-            "shader": "none"               // 禁用外置 Shader 避免兼容性错误回退到软渲染
+            "videoSmooth": true,             // 基础平滑
+            "webgl2Enabled": "enabled",      // 启用硬件 WebGL 2.0
+            "shader": "xbrz/xbrz-freescale"  // 【核心重点】启用高清矢量拉伸滤镜（专治 2D 街机马赛克）
         };
 
-        // 5. 机种专有逻辑与 BIOS 匹配
-        if (coreType === 'ps1' || coreType === 'playstation') {
-            window.EJS_biosUrl = "./bios/scph5502.bin";
-            settingsConfig = {
-                ...settingsConfig,
-                "pcsx_rearmed_gpu": "gpu_unai",
-                "pcsx_rearmed_resolution": 2,
-                "pcsx_rearmed_dithering": "disabled",
-                "pcsx_rearmed_frameskip": 0
-            };
-
-            fetch('./bios/scph5502.bin', { method: 'HEAD' })
-                .then(response => {
-                    if (!response.ok) {
-                        window.EJS_biosUrl = "./bios/scph5501.bin";
-                    }
-                })
-                .catch(() => {
-                    window.EJS_biosUrl = "./bios/scph5501.bin";
-                });
-        }
-        else if (coreType === 'gba') {
-            window.EJS_biosUrl = "./bios/gba_bios.bin";
-            settingsConfig = {
-                ...settingsConfig,
-                "mgba_interframe_blending": false,
-                "mgba_video_color_correction": "enabled",
-                "mgba_lcd_ghosting": "disabled",
-                "mgba_fps": 60
-            };
-        }
-        else if (coreType === 'gb' || coreType === 'gbc') {
-            window.EJS_biosUrl = "./bios/gbc_bios.bin";
-            settingsConfig = {
-                ...settingsConfig,
-                "gambatte_gb_internal_palette": "optimized",
-                "gambatte_mix_frames": "disabled"
-            };
-        }
-        else if (coreType === 'segacd') {
-            window.EJS_biosUrl = "./bios/bios_CD_U.bin";
-        }
-        else if (coreType === 'saturn') {
-            window.EJS_biosUrl = "./bios/saturn_bios.bin";
-        }
-        else if (coreType === 'nds') {
-            window.EJS_biosUrl = "./bios/bios7.bin";
-            settingsConfig = {
-                ...settingsConfig,
-                "melonds_fps": 60
-            };
-
-            fetch('./bios/bios7.bin', { method: 'HEAD' })
-                .then(response => {
-                    if (!response.ok) {
-                        window.EJS_biosUrl = "./bios/bios9.bin";
-                        return fetch('./bios/bios9.bin', { method: 'HEAD' });
-                    }
-                })
-                .then(response => {
-                    if (response && !response.ok) {
-                        window.EJS_biosUrl = "./bios/firmware.bin";
-                    }
-                });
-        }
-        else if (coreType === 'neogeopocket' || coreType === 'neogeopocketcolor') {
-            window.EJS_biosUrl = "./bios/Neo-Geo_Pocket_Color.bin";
-            fetch('./bios/Neo-Geo_Pocket_Color.bin', { method: 'HEAD' })
-                .then(response => {
-                    if (!response.ok) {
-                        window.EJS_biosUrl = "./bios/Neo-Geo_Pocket.bin";
-                    }
-                })
-                .catch(() => {
-                    window.EJS_biosUrl = "./bios/Neo-Geo_Pocket.bin";
-                });
-        }
-
-        // 街机 FBNeo / NeoGeo 模式渲染设定
         if (coreType === 'mame' || coreType === 'fbneo' || coreType === 'arcade' || coreType === 'neogeo') {
-            settingsConfig = {
-                ...settingsConfig,
+            window.EJS_settings = {
+                ...window.EJS_settings,
                 "fbneo-neogeo-mode": "UNIBIOS",
                 "fbneo-cpu-speed-adjust": 100,
                 "fbneo-frameskip": 0,
-                "fbneo-interpolation": 1        // FBNeo 核心内部开启纹理插值平滑
+                "fbneo-interpolation": 2     // 提升核心内部插值等级（由 1 改为 2）
             };
 
             window.EJS_biosUrl = "./bios/neogeo.zip";
-            console.log("NeoGeo/Arcade mode: Using neogeo.zip BIOS from", window.EJS_biosUrl);
-
             if (game && game.includes('mslug6')) {
                 window.EJS_biosUrl = "./bios/awbios.zip";
             }
         }
-
-        // 6. 关键步骤：使用 Object.freeze 锁定配置，防止 loader.js 或 emulator.min.js 修改覆盖
-        window.EJS_settings = Object.freeze(settingsConfig);
     </script>
     <script src="./ems/data/loader.js"></script>
 </body>
