@@ -19,25 +19,25 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        position: relative;
     }
-    /* 隐藏原始像素 Canvas */
+    #game {
+        width: 100%;
+        height: 100%;
+    }
+    /* 强行对 WebGL 画布应用 GPU 层面的抗锯齿与色彩增强 */
     #game canvas {
-        display: none !important;
-    }
-    /* 显示矢量算法重构后的 Canvas */
-    #hd-canvas {
-        width: 100vw;
-        height: 100vh;
+        width: 100vw !important;
+        height: 100vh !important;
         object-fit: contain;
-        image-rendering: auto;
+        image-rendering: auto !important; /* 开启硬件级双线性平滑，消除颗粒感 */
+        filter: contrast(102%) saturate(105%); /* 增强街机基板对比度 */
+        transform: translateZ(0);
     }
     </style>
 </head>
 <body>
     <div id="game-container">
         <div id="game"></div>
-        <canvas id="hd-canvas"></canvas>
     </div>
     <script>
         const urlParams = new URLSearchParams(window.location.search);
@@ -62,6 +62,7 @@
         const folderMap = { 'mame': 'fbneo', 'ps1': 'playstation', 'playstation': 'playstation' };
         const coreType = type ? type.toLowerCase() : '';
 
+        // 基础参数配置
         window.EJS_player = '#game';
         window.EJS_pathtodata = './ems/data/';
         window.EJS_language = 'en-US';
@@ -79,79 +80,9 @@
         }
 
         window.EJS_threads = !!window.crossOriginIsolated;
-        window.EJS_videoSmooth = false;
 
-        // --- 核心矢量渲染引擎（HQ2X Pixel Vectorizer） ---
-        window.EJS_onGameStart = function() {
-            const hdCanvas = document.getElementById('hd-canvas');
-            const hdCtx = hdCanvas.getContext('2d');
-
-            const checkSourceCanvas = setInterval(() => {
-                const srcCanvas = document.querySelector('#game canvas');
-                if (srcCanvas && srcCanvas.width > 0) {
-                    clearInterval(checkSourceCanvas);
-
-                    const w = srcCanvas.width;
-                    const h = srcCanvas.height;
-
-                    // 输出 Canvas 分辨率倍增
-                    hdCanvas.width = w * 2;
-                    hdCanvas.height = h * 2;
-
-                    const tempCanvas = document.createElement('canvas');
-                    tempCanvas.width = w;
-                    tempCanvas.height = h;
-                    const tempCtx = tempCanvas.getContext('2d');
-
-                    // 逐帧 HQ2X 算法重构成像
-                    function processVectorFrame() {
-                        if (srcCanvas.width > 0) {
-                            tempCtx.drawImage(srcCanvas, 0, 0);
-                            const srcData = tempCtx.getImageData(0, 0, w, h);
-                            const dstData = hdCtx.createImageData(w * 2, h * 2);
-
-                            const src = new Uint32Array(srcData.data.buffer);
-                            const dst = new Uint32Array(dstData.data.buffer);
-
-                            // HQ2X 矢量插值平滑处理
-                            for (let y = 0; y < h; y++) {
-                                for (let x = 0; x < w; x++) {
-                                    const i = y * w + x;
-                                    const p = src[i];
-
-                                    // 获取周边邻域像素
-                                    const pUp = y > 0 ? src[i - w] : p;
-                                    const pDown = y < h - 1 ? src[i + w] : p;
-                                    const pLeft = x > 0 ? src[i - 1] : p;
-                                    const pRight = x < w - 1 ? src[i + 1] : p;
-
-                                    const outI = (y * 2) * (w * 2) + (x * 2);
-
-                                    // 计算矢量边缘插值
-                                    dst[outI] = (p === pUp && p === pLeft) ? p : blend(p, pUp, pLeft);
-                                    dst[outI + 1] = (p === pUp && p === pRight) ? p : blend(p, pUp, pRight);
-                                    dst[outI + (w * 2)] = (p === pDown && p === pLeft) ? p : blend(p, pDown, pLeft);
-                                    dst[outI + (w * 2) + 1] = (p === pDown && p === pRight) ? p : blend(p, pDown, pRight);
-                                }
-                            }
-                            hdCtx.putImageData(dstData, 0, 0);
-                        }
-                        requestAnimationFrame(processVectorFrame);
-                    }
-
-                    // RGB 颜色矢量混色函数
-                    function blend(c1, c2, c3) {
-                        const r = (((c1 & 0xFF) + (c2 & 0xFF) + (c3 & 0xFF)) / 3) & 0xFF;
-                        const g = ((((c1 >> 8) & 0xFF) + ((c2 >> 8) & 0xFF) + ((c3 >> 8) & 0xFF)) / 3) & 0xFF;
-                        const b = ((((c1 >> 16) & 0xFF) + ((c2 >> 16) & 0xFF) + ((c3 >> 16) & 0xFF)) / 3) & 0xFF;
-                        const a = (c1 >> 24) & 0xFF;
-                        return (a << 24) | (b << 16) | (g << 8) | r;
-                    }
-
-                    requestAnimationFrame(processVectorFrame);
-                }
-            }, 100);
-        };
+        // 开启模拟器平滑模式开关
+        window.EJS_videoSmooth = true;
     </script>
     <script src="./ems/data/loader.js"></script>
 </body>
