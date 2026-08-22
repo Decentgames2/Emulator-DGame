@@ -3,11 +3,12 @@
 <head>
     <meta charset="utf-8">
     <title>Emulator-Game</title>
+    <script src="./coi-serviceworker.js"></script>
     <style>
     body,html{margin:0;padding:0;width:100%;height:100%;background: #000000}
     #game-container {width:100vw;height:100vh;}
-    /* 锐利像素风：最近邻放大，保持像素点绝对锐利（保留） */
     canvas {
+        /* 强行使用像素邻近法拉伸，保持像素点绝对锐利 */
         image-rendering: -moz-crisp-edges !important;
         image-rendering: -webkit-optimize-contrast !important;
         image-rendering: pixelated !important;
@@ -30,6 +31,10 @@
 
         window.EJS_DEBUG_XX = false;
         window.EJS_player = '#game';
+
+        // 强行开启 EmulatorJS 全局锐化
+        window.EJS_scale = 1;
+        window.EJS_sharp = true;
 
         const coreMap = {
             'ps1': 'pcsx_rearmed',
@@ -72,18 +77,33 @@
 
         window.EJS_language = 'en-US';
 
-        // 本版本 EmulatorJS 只认 EJS_defaultOptions（EJS_settings 不会被读取）
-        window.EJS_defaultOptions = {
-            "webgl2Enabled": "disabled"   // 强制两边使用同一套渲染核心，避免本地/GitHub 表现不一致
+        // --- 核心路径配置 ---
+        window.EJS_settings = {
+            "corePath": "./ems/data/cores/",
+            "memorySize": 512,
+            "frameRate": 70,
+            "fastForward": true,
+            "slowMotion": false,
+            "rewindEnabled": "enabled",
+            "cheatsEnabled": false,
+            "videoScale": 3,
+            "videoSmooth": false,        // 【修改】关闭全局画面平滑
+            "videoFilter": "none",
+            "internalResolution": 1,
+            "initialMemorySize": 256,
+            "autoFrameSkip": true,
+            "frameSkip": 0
         };
 
         if (coreType === 'ps1' || coreType === 'playstation') {
             window.EJS_biosUrl = "./bios/scph5502.bin";
 
-            window.EJS_defaultOptions = {
-                ...window.EJS_defaultOptions,
+            window.EJS_settings = {
+                ...window.EJS_settings,
                 "pcsx_rearmed_gpu": "gpu_unai",
+                "pcsx_rearmed_resolution": 2,
                 "pcsx_rearmed_dithering": "disabled",
+                "initialMemorySize": 128,
                 "pcsx_rearmed_frameskip": 0
             };
 
@@ -104,18 +124,19 @@
         else if (coreType === 'gba') {
             window.EJS_biosUrl = "./bios/gba_bios.bin";
 
-            window.EJS_defaultOptions = {
-                ...window.EJS_defaultOptions,
+            window.EJS_settings = {
+                ...window.EJS_settings,
                 "mgba_interframe_blending": false,
                 "mgba_video_color_correction": "enabled",
-                "mgba_lcd_ghosting": "disabled"
+                "mgba_lcd_ghosting": "disabled",
+                "mgba_fps": 60
             };
         }
         else if (coreType === 'gb' || coreType === 'gbc') {
             window.EJS_biosUrl = "./bios/gbc_bios.bin";
 
-            window.EJS_defaultOptions = {
-                ...window.EJS_defaultOptions,
+            window.EJS_settings = {
+                ...window.EJS_settings,
                 "gambatte_gb_internal_palette": "optimized",
                 "gambatte_mix_frames": "disabled"
             };
@@ -129,8 +150,8 @@
         else if (coreType === 'nds') {
             window.EJS_biosUrl = "./bios/bios7.bin";
 
-            window.EJS_defaultOptions = {
-                ...window.EJS_defaultOptions,
+            window.EJS_settings = {
+                ...window.EJS_settings,
                 "initialMemorySize": 128,
                 "melonds_fps": 60
             };
@@ -167,12 +188,16 @@
         }
 
         if (coreType === 'mame' || coreType === 'fbneo' || coreType === 'arcade' || coreType === 'neogeo') {
-            window.EJS_defaultOptions = {
-                ...window.EJS_defaultOptions,
+            window.EJS_settings = {
+                ...window.EJS_settings,
+                "webgl2Enabled": "enabled",
+                "videoScale": 3,
+                "videoSmooth": false,         // 【修改】关闭 Arcade 模式的画面平滑
                 "fbneo-neogeo-mode": "UNIBIOS",
                 "fbneo-cpu-speed-adjust": 100,
-                "fbneo-frameskip": 0,
-                "fbneo-interpolation": 0
+                "fbneo-frameskip": 0,          // 【建议】帧率为 0 或不跳帧，画面更流畅
+                "fbneo-interpolation": 0,
+                "shader": "sharp"              // 【修改】放弃 sabr，强制使用 sharp 滤镜（纯像素锐化）
             };
 
             window.EJS_biosUrl = "./bios/neogeo.zip";
@@ -184,8 +209,6 @@
             }
         }
 
-        // 修复：核心在部分环境下初始化时未同步画布缓冲尺寸（停留在 300x150），
-        // 导致画面被 pixelated 拉伸成马赛克。游戏启动后强制触发 resize 修正。
         window.EJS_onGameStart = () => {
             const fixCanvasBuffer = () => {
                 const c = document.querySelector('canvas.ejs_canvas');
