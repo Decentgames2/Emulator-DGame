@@ -183,6 +183,26 @@
                 console.log("MSlug6 detected: Using awbios.zip BIOS");
             }
         }
+
+        // 修复：核心在部分环境下初始化时未同步画布缓冲尺寸（停留在 300x150），
+        // 导致画面被 pixelated 拉伸成马赛克。游戏启动后强制触发 resize 修正。
+        window.EJS_onGameStart = () => {
+            const fixCanvasBuffer = () => {
+                const c = document.querySelector('canvas.ejs_canvas');
+                if (!c) return;
+                window.dispatchEvent(new Event('resize'));
+                setTimeout(() => {
+                    if (c.width < 600) {
+                        const r = c.getBoundingClientRect();
+                        c.width = Math.round(r.width);
+                        c.height = Math.round(r.height);
+                    }
+                }, 500);
+            };
+            setTimeout(fixCanvasBuffer, 1000);
+            setTimeout(fixCanvasBuffer, 3000);
+            window.addEventListener('resize', () => setTimeout(fixCanvasBuffer, 300));
+        };
     </script>
     <script src="./ems/data/loader.js"></script>
 </body>
