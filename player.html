@@ -76,15 +76,12 @@
         window.EJS_settings = {
             "corePath": "./ems/data/cores/",
             "memorySize": 512,
-            "initialMemorySize": 128,
-            "frameRate": 70,
+            "frameRate": 60,
             "fastForward": true,
             "slowMotion": false,
             "rewindEnabled": "enabled",
             "cheatsEnabled": false,
-            "videoScale": 3,
-            "videoSmooth": true,  // 开启画面平滑插值[cite: 1]
-            "shader": "none",
+            "videoSmooth": true,           // 开启平滑抗锯齿
             "videoFilter": "none",
             "autoFrameSkip": true,
             "frameSkip": 0
@@ -186,21 +183,17 @@
             window.EJS_settings = {
                 ...window.EJS_settings,
                 "webgl2Enabled": "enabled",
-                "videoScale": 3,
-                "videoSmooth": true,  // 【修改】关闭 Arcade 模式的画面平滑
                 "fbneo-neogeo-mode": "UNIBIOS",
                 "fbneo-cpu-speed-adjust": 100,
                 "fbneo-frameskip": 0,
-                "fbneo-interpolation": 0,
-                "shader": "sabr"
+                "fbneo-interpolation": 1,   // 开启核心内部纹理插值
+                "shader": "sabr"            // 使用高质量像素矢量化滤镜（可设为 "none" 或 "sabr"）
             };
 
             window.EJS_biosUrl = "./bios/neogeo.zip";
-            console.log("NeoGeo/Arcade mode: Using neogeo.zip BIOS from", window.EJS_biosUrl);
 
             if (game && game.includes('mslug6')) {
                 window.EJS_biosUrl = "./bios/awbios.zip";
-                console.log("MSlug6 detected: Using awbios.zip BIOS");
             }
         }
     </script>
