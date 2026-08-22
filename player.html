@@ -16,9 +16,10 @@
         width: 100vw;
         height: 100vh;
     }
+    /* 强制使用浏览器标准双线性平滑，禁止硬拉马赛克 */
     canvas {
-        /* 使用标准渲染，交由 WebGL 与 Shader 处理高清放大，彻底告别锯齿马赛克与模糊 */
         image-rendering: auto !important;
+        image-rendering: bilinear !important;
     }
     </style>
 </head>
@@ -27,7 +28,7 @@
         <div id="game"></div>
     </div>
     <script>
-        // 1. 获取 URL 参数
+        // 1. 解析 URL 参数
         const urlParams = new URLSearchParams(window.location.search);
         const game = urlParams.get('game');
         let type = urlParams.get('type');
@@ -36,13 +37,13 @@
             type = type.split('?')[0];
         }
 
-        // 2. 基础全局配置
+        // 2. 基础全局环境变量
         window.EJS_DEBUG_XX = false;
         window.EJS_player = '#game';
         window.EJS_pathtodata = './ems/data/';
         window.EJS_language = 'en-US';
 
-        // 【关键修复】禁用 localStorage 读取，防止浏览器记住之前导致马赛克/模糊的旧配置
+        // 强制禁用本地存储，防止旧配置死灰复燃
         window.EJS_disableLocalStorage = true;
 
         // 3. 平台核心与路径映射表
@@ -82,30 +83,31 @@
             console.log('Game URL:', window.EJS_gameUrl);
         }
 
-        // 4. 全局核心默认配置（解决内存不足警告与画面渲染问题）
-        window.EJS_settings = {
+        // 4. 基础运行环境参数定义
+        let settingsConfig = {
             "corePath": "./ems/data/cores/",
-            "memorySize": 512,            // 最大分配内存 (MB)
-            "initialMemorySize": 256,     // 【关键修复】提升初始堆内存为 256MB，解决解压 ROM 时的内存扩容警告
+            "memorySize": 512,            // 允许最大的内存
+            "initialMemorySize": 256,     // 预加载堆内存为 256MB，防止警告和软渲染回退
             "frameRate": 60,
             "fastForward": true,
             "slowMotion": false,
             "rewindEnabled": "enabled",
             "cheatsEnabled": false,
-            "videoSmooth": true,           // 开启全局硬件级渲染平滑
+            "videoSmooth": true,           // 开启平滑过滤
             "autoFrameSkip": true,
-            "frameSkip": 0
+            "frameSkip": 0,
+            "webgl2Enabled": "enabled",    // 强制开启 WebGL 2.0 硬件加速
+            "shader": "none"               // 禁用外置 Shader 避免兼容性错误回退到软渲染
         };
 
-        // 5. 各机种针对性优化设置
+        // 5. 机种专有逻辑与 BIOS 匹配
         if (coreType === 'ps1' || coreType === 'playstation') {
             window.EJS_biosUrl = "./bios/scph5502.bin";
-            window.EJS_settings = {
-                ...window.EJS_settings,
+            settingsConfig = {
+                ...settingsConfig,
                 "pcsx_rearmed_gpu": "gpu_unai",
                 "pcsx_rearmed_resolution": 2,
                 "pcsx_rearmed_dithering": "disabled",
-                "initialMemorySize": 256,
                 "pcsx_rearmed_frameskip": 0
             };
 
@@ -121,8 +123,8 @@
         }
         else if (coreType === 'gba') {
             window.EJS_biosUrl = "./bios/gba_bios.bin";
-            window.EJS_settings = {
-                ...window.EJS_settings,
+            settingsConfig = {
+                ...settingsConfig,
                 "mgba_interframe_blending": false,
                 "mgba_video_color_correction": "enabled",
                 "mgba_lcd_ghosting": "disabled",
@@ -131,8 +133,8 @@
         }
         else if (coreType === 'gb' || coreType === 'gbc') {
             window.EJS_biosUrl = "./bios/gbc_bios.bin";
-            window.EJS_settings = {
-                ...window.EJS_settings,
+            settingsConfig = {
+                ...settingsConfig,
                 "gambatte_gb_internal_palette": "optimized",
                 "gambatte_mix_frames": "disabled"
             };
@@ -145,9 +147,8 @@
         }
         else if (coreType === 'nds') {
             window.EJS_biosUrl = "./bios/bios7.bin";
-            window.EJS_settings = {
-                ...window.EJS_settings,
-                "initialMemorySize": 256,
+            settingsConfig = {
+                ...settingsConfig,
                 "melonds_fps": 60
             };
 
@@ -177,17 +178,14 @@
                 });
         }
 
-        // 6. Arcade / FBNeo / NeoGeo 模式高清渲染优化
+        // 街机 FBNeo / NeoGeo 模式渲染设定
         if (coreType === 'mame' || coreType === 'fbneo' || coreType === 'arcade' || coreType === 'neogeo') {
-            window.EJS_settings = {
-                ...window.EJS_settings,
-                "webgl2Enabled": "enabled",
-                "videoSmooth": true,             // 开启双线性平滑插值
+            settingsConfig = {
+                ...settingsConfig,
                 "fbneo-neogeo-mode": "UNIBIOS",
                 "fbneo-cpu-speed-adjust": 100,
                 "fbneo-frameskip": 0,
-                "fbneo-interpolation": 1,        // 开启 FBNeo 核心纹理增强
-                "shader": "sabr"                 // 【核心修改】启用 SABR 矢量渲染滤镜，消除像素马赛克同时保持字体清晰
+                "fbneo-interpolation": 1        // FBNeo 核心内部开启纹理插值平滑
             };
 
             window.EJS_biosUrl = "./bios/neogeo.zip";
@@ -197,6 +195,9 @@
                 window.EJS_biosUrl = "./bios/awbios.zip";
             }
         }
+
+        // 6. 关键步骤：使用 Object.freeze 锁定配置，防止 loader.js 或 emulator.min.js 修改覆盖
+        window.EJS_settings = Object.freeze(settingsConfig);
     </script>
     <script src="./ems/data/loader.js"></script>
 </body>
