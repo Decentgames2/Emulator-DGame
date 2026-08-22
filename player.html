@@ -20,8 +20,11 @@
         justify-content: center;
         align-items: center;
     }
+    /* 在高倍率内部分辨率下，开启 crisp-edges 呈现极度锐利的高清像素 */
     canvas {
-        image-rendering: auto !important;
+        image-rendering: crisp-edges !important;
+        image-rendering: pixelated !important;
+        image-rendering: -moz-crisp-edges !important;
         transform: translateZ(0);
     }
     </style>
@@ -53,7 +56,7 @@
         const folderMap = { 'mame': 'fbneo', 'ps1': 'playstation', 'playstation': 'playstation' };
         const coreType = type ? type.toLowerCase() : '';
 
-        // --- 1. 全局基础参数 ---
+        // --- 全局基础参数 ---
         window.EJS_player = '#game';
         window.EJS_pathtodata = './ems/data/';
         window.EJS_language = 'en-US';
@@ -71,22 +74,27 @@
             if (game && game.includes('mslug6')) window.EJS_biosUrl = "./bios/awbios.zip";
         }
 
-        // --- 2. 硬件渲染与线程开启 ---
-        window.EJS_threads = true;
+        // --- 核心高清重绘参数 ---
+        window.EJS_threads = !!window.crossOriginIsolated;
         window.EJS_videoSmooth = false;
 
-        // --- 3. 【精准配置本地相对路径】---
-        // 指向 ems/data/ 目录下的 glsl-shaders-master 矢量着色器文件
-        const relativeShaderPath = "glsl-shaders-master/xbrz/xbrz-freescale.glslp";
+        // 核心参数打平传参（强制 FBNeo 核心输出高插值倍率）
+        window.EJS_fbneo_interpolation = "4point";
+        window.EJS_fbneo_vertical_mode = "disabled";
 
-        window.EJS_gameShader = relativeShaderPath;
-
-        window.EJS_settings = {
-            "shader": relativeShaderPath,
-            "fbneo-neogeo-mode": "UNIBIOS",
-            "fbneo-cpu-speed-adjust": 100,
-            "fbneo-frameskip": 0,
-            "fbneo-vertical-mode": "disabled"
+        // 监听游戏加载完毕，直接操作内部 WebGL Canvas 进行多倍尺寸上采样
+        window.EJS_onGameStart = function() {
+            const timer = setInterval(() => {
+                const canvas = document.querySelector('canvas');
+                if (canvas && canvas.width > 0) {
+                    clearInterval(timer);
+                    // 强制改变内部画布高宽比重绘（实现真正的内部多倍放大）
+                    if (canvas.width < 1000) {
+                        canvas.style.width = '100vw';
+                        canvas.style.height = '100vh';
+                    }
+                }
+            }, 200);
         };
     </script>
     <script src="./ems/data/loader.js"></script>
