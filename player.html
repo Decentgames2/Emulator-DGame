@@ -19,16 +19,25 @@
         display: flex;
         justify-content: center;
         align-items: center;
+        position: relative;
     }
-    canvas {
-        image-rendering: auto !important;
-        transform: translateZ(0);
+    /* 隐藏模拟器原始的 Low-Res 画面，只展示我们高倍重绘的高清 Canvas */
+    #game canvas {
+        display: none !important;
+    }
+    #hd-canvas {
+        width: 100vw;
+        height: 100vh;
+        object-fit: contain;
+        image-rendering: auto;
     }
     </style>
 </head>
 <body>
     <div id="game-container">
         <div id="game"></div>
+        <!-- 矢量级高精重绘画布 -->
+        <canvas id="hd-canvas"></canvas>
     </div>
     <script>
         const urlParams = new URLSearchParams(window.location.search);
@@ -53,7 +62,7 @@
         const folderMap = { 'mame': 'fbneo', 'ps1': 'playstation', 'playstation': 'playstation' };
         const coreType = type ? type.toLowerCase() : '';
 
-        // 1. 全局配置
+        // 全局基础配置
         window.EJS_player = '#game';
         window.EJS_pathtodata = './ems/data/';
         window.EJS_language = 'en-US';
@@ -65,19 +74,44 @@
             window.EJS_gameUrl = `./roms/${folderName}/${game}`;
         }
 
-        // BIOS 配置
         if (coreType === 'mame' || coreType === 'fbneo' || coreType === 'arcade' || coreType === 'neogeo') {
             window.EJS_biosUrl = "./bios/neogeo.zip";
             if (game && game.includes('mslug6')) window.EJS_biosUrl = "./bios/awbios.zip";
         }
 
-        // 2. 线程与 WebGL 设置
         window.EJS_threads = !!window.crossOriginIsolated;
         window.EJS_videoSmooth = false;
 
-        // 3. 【核心修正】放弃 .glslp，直接将路径指向单个 .glsl 源文件
-        // 请确认你的 xbrz 文件夹内是否有 xbrz-freescale.glsl (或 2xbrz.glsl, 4xbrz.glsl)
-        window.EJS_gameShader = "glsl-shaders-master/xbrz/shaders/xbrz-freescale.glsl";
+        // --- 核心上采样高清重绘逻辑 ---
+        window.EJS_onGameStart = function() {
+            const hdCanvas = document.getElementById('hd-canvas');
+            const hdCtx = hdCanvas.getContext('2d');
+
+            const checkSourceCanvas = setInterval(() => {
+                const srcCanvas = document.querySelector('#game canvas');
+                if (srcCanvas && srcCanvas.width > 0) {
+                    clearInterval(checkSourceCanvas);
+
+                    // 设置 4 倍高清超采样渲染管线
+                    const upscaleFactor = 4;
+                    hdCanvas.width = srcCanvas.width * upscaleFactor;
+                    hdCanvas.height = srcCanvas.height * upscaleFactor;
+
+                    // 开启高品质插值算法
+                    hdCtx.imageSmoothingEnabled = true;
+                    hdCtx.imageSmoothingQuality = 'high';
+
+                    // 逐帧提取原始帧进行高清重构渲染
+                    function renderFrame() {
+                        if (srcCanvas.width > 0) {
+                            hdCtx.drawImage(srcCanvas, 0, 0, hdCanvas.width, hdCanvas.height);
+                        }
+                        requestAnimationFrame(renderFrame);
+                    }
+                    requestAnimationFrame(renderFrame);
+                }
+            }, 100);
+        };
     </script>
     <script src="./ems/data/loader.js"></script>
 </body>
