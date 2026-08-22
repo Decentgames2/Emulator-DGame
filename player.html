@@ -2,6 +2,8 @@
 <html>
 <head>
     <meta charset="utf-8">
+    <!-- 1. 最顶端引入 Service Worker，解决 GitHub Pages 的 SharedArrayBuffer 响应头限制 -->
+    <script src="./coi-serviceworker.js"></script>
     <title>Emulator-Game</title>
     <style>
     body, html {
@@ -19,8 +21,7 @@
         justify-content: center;
         align-items: center;
     }
-
-    /* 强制重写 Canvas 样式，消除锯齿方块 */
+    /* 强效平滑滤镜，取消硬像素方块拉伸 */
     canvas {
         image-rendering: auto !important;
         image-rendering: smooth !important;
@@ -56,35 +57,46 @@
         const folderMap = { 'mame': 'fbneo', 'ps1': 'playstation', 'playstation': 'playstation' };
         const coreType = type ? type.toLowerCase() : '';
 
-        // --- 全局根配置打平绑定 ---
+        // --- 全局根属性绑定 ---
         window.EJS_player = '#game';
         window.EJS_pathtodata = './ems/data/';
         window.EJS_language = 'en-US';
         window.EJS_core = coreMap[coreType] || coreType;
-        window.EJS_disableLocalStorage = true; // 清除错乱的缓存
+        window.EJS_disableLocalStorage = true;
 
         if (game && type) {
             const folderName = folderMap[coreType] || coreType;
             window.EJS_gameUrl = `./roms/${folderName}/${game}`;
         }
 
-        // BIOS 自动匹配
+        // BIOS 配置
         if (coreType === 'mame' || coreType === 'fbneo' || coreType === 'arcade' || coreType === 'neogeo') {
             window.EJS_biosUrl = "./bios/neogeo.zip";
             if (game && game.includes('mslug6')) window.EJS_biosUrl = "./bios/awbios.zip";
         }
 
-        // --- 强制插值与硬件平滑设置 (正确写法) ---
-        window.EJS_videoSmooth = true; // 强制开启视频平滑插值
-        window.EJS_threads = true;     // 开启多线程运算加速渲染
+        // --- 启用多线程硬件加速与矢量优化 ---
+        window.EJS_threads = true;       // 依赖 coi-serviceworker 解锁真正的 SharedArrayBuffer 多线程加速
+        window.EJS_videoSmooth = true;   // 开启图像硬件平滑
+        window.EJS_scale = 2;            // 强行扩大内部分辨率
 
-        // 监听渲染完成，强制修改 WebGL 上下文平滑度
+        // 针对 FBNeo / 街机核心的渲染增强
+        if (coreType === 'mame' || coreType === 'fbneo' || coreType === 'arcade' || coreType === 'neogeo') {
+            window.EJS_settings = {
+                "fbneo-neogeo-mode": "UNIBIOS",
+                "fbneo-cpu-speed-adjust": 100,
+                "fbneo-frameskip": 0,
+                "fbneo-interpolation": "4point"
+            };
+        }
+
+        // 加载完成后二次保底 Canvas 强制渲染设置
         window.EJS_onGameStart = function() {
             setTimeout(() => {
                 const canvas = document.querySelector('canvas');
                 if (canvas) {
-                    canvas.style.setProperty('image-rendering', 'smooth', 'important');
                     canvas.style.setProperty('image-rendering', 'auto', 'important');
+                    canvas.style.setProperty('image-rendering', 'smooth', 'important');
                     const ctx = canvas.getContext('2d') || canvas.getContext('webgl') || canvas.getContext('webgl2');
                     if (ctx && ctx.imageSmoothingEnabled !== undefined) {
                         ctx.imageSmoothingEnabled = true;
