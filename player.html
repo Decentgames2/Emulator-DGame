@@ -15,9 +15,20 @@
     #game-container {
         width: 100vw;
         height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
     }
+
+    /*
+       【关键 CSS】
+       打破传统 image-rendering: pixelated; 带来的硬方块马赛克！
+       使用高保真平滑拉伸，配合硬件 GPU 上采样
+    */
     canvas {
+        image-rendering: -webkit-optimize-contrast;
         image-rendering: auto !important;
+        transform: translateZ(0); /* 开启 GPU 硬件加速图层 */
     }
     </style>
 </head>
@@ -41,41 +52,26 @@
         window.EJS_disableLocalStorage = true;
 
         const coreMap = {
-            'ps1': 'pcsx_rearmed',
-            'playstation': 'pcsx_rearmed',
-            'nes': 'fceumm',
-            'snes': 'snes9x',
-            'gb': 'gambatte',
-            'gbc': 'gambatte',
-            'gba': 'mgba',
-            'nds': 'melonds',
-            'n64': 'mupen64plus_next',
-            'genesis': 'genesis_plus_gx',
-            'sega': 'genesis_plus_gx',
-            'segacd': 'genesis_plus_gx',
-            'saturn': 'yabause',
-            'neogeopocket': 'mednafen_ngp',
-            'neogeopocketcolor': 'mednafen_ngp',
-            'neogeo': 'fbneo',
-            'arcade': 'fbneo'
+            'ps1': 'pcsx_rearmed', 'playstation': 'pcsx_rearmed',
+            'nes': 'fceumm', 'snes': 'snes9x',
+            'gb': 'gambatte', 'gbc': 'gambatte', 'gba': 'mgba',
+            'nds': 'melonds', 'n64': 'mupen64plus_next',
+            'genesis': 'genesis_plus_gx', 'sega': 'genesis_plus_gx',
+            'segacd': 'genesis_plus_gx', 'saturn': 'yabause',
+            'neogeopocket': 'mednafen_ngp', 'neogeopocketcolor': 'mednafen_ngp',
+            'neogeo': 'fbneo', 'arcade': 'fbneo'
         };
 
-        const folderMap = {
-            'mame': 'fbneo',
-            'ps1': 'playstation',
-            'playstation': 'playstation'
-        };
-
+        const folderMap = { 'mame': 'fbneo', 'ps1': 'playstation', 'playstation': 'playstation' };
         const coreType = type ? type.toLowerCase() : '';
-        const mappedCore = coreMap[coreType] || coreType;
-        window.EJS_core = mappedCore;
+        window.EJS_core = coreMap[coreType] || coreType;
 
         if (game && type) {
             const folderName = folderMap[coreType] || coreType;
             window.EJS_gameUrl = `./roms/${folderName}/${game}`;
         }
 
-        // --- 核心优化参数设置 ---
+        // 默认全局设置
         window.EJS_settings = {
             "corePath": "./ems/data/cores/",
             "memorySize": 512,
@@ -85,9 +81,9 @@
             "slowMotion": false,
             "rewindEnabled": "enabled",
             "cheatsEnabled": false,
-            "videoSmooth": true,             // 基础平滑
-            "webgl2Enabled": "enabled",      // 启用硬件 WebGL 2.0
-            "shader": "xbrz/xbrz-freescale"  // 【核心重点】启用高清矢量拉伸滤镜（专治 2D 街机马赛克）
+            "videoSmooth": true,             // 开启全局平滑插值
+            "webgl2Enabled": "enabled",      // 开启 WebGL 2.0
+            "shader": "sharp"                // 使用 EmulatorJS 内置的通用 Sharp 锐化处理
         };
 
         if (coreType === 'mame' || coreType === 'fbneo' || coreType === 'arcade' || coreType === 'neogeo') {
@@ -96,13 +92,11 @@
                 "fbneo-neogeo-mode": "UNIBIOS",
                 "fbneo-cpu-speed-adjust": 100,
                 "fbneo-frameskip": 0,
-                "fbneo-interpolation": 2     // 提升核心内部插值等级（由 1 改为 2）
+                "fbneo-interpolation": 2     // 让 FBNeo 核心以最高等级（2x）放大原图
             };
 
             window.EJS_biosUrl = "./bios/neogeo.zip";
-            if (game && game.includes('mslug6')) {
-                window.EJS_biosUrl = "./bios/awbios.zip";
-            }
+            if (game && game.includes('mslug6')) window.EJS_biosUrl = "./bios/awbios.zip";
         }
     </script>
     <script src="./ems/data/loader.js"></script>
