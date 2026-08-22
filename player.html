@@ -7,7 +7,7 @@
     body,html{margin:0;padding:0;width:100%;height:100%;background: #000000}
     #game-container {width:100vw;height:100vh;}
     canvas {
-        /* 恢复标准抗锯齿拉伸，消除马赛克方块 */
+        /* 使用标准缩放，由 Shader 负责高清重绘 */
         image-rendering: auto !important;
     }
     </style>
@@ -27,10 +27,7 @@
 
         window.EJS_DEBUG_XX = false;
         window.EJS_player = '#game';
-
-        // 关闭强制锐化
-        window.EJS_scale = 1;
-        window.EJS_sharp = false;
+        window.EJS_disableLocalStorage = true; // 【关键】防止读取浏览器保存的旧马赛克/模糊设置
 
         const coreMap = {
             'ps1': 'pcsx_rearmed',
@@ -65,126 +62,40 @@
         if (game && type) {
             const folderName = folderMap[coreType] || coreType;
             window.EJS_gameUrl = `./roms/${folderName}/${game}`;
-            console.log('Game URL:', window.EJS_gameUrl);
         }
 
         window.EJS_pathtodata = './ems/data/';
-        console.log('Path to data:', window.EJS_pathtodata);
-
         window.EJS_language = 'en-US';
 
-        // --- 全局参数配置 ---
+        // --- 全局默认参数配置 ---
         window.EJS_settings = {
             "corePath": "./ems/data/cores/",
             "memorySize": 512,
+            "initialMemorySize": 256,
             "frameRate": 60,
             "fastForward": true,
             "slowMotion": false,
             "rewindEnabled": "enabled",
             "cheatsEnabled": false,
-            "videoSmooth": true,            // 开启画面平滑过度
-            "videoFilter": "none",
-            "initialMemorySize": 256,
+            "videoSmooth": true,             // 开启基础抗锯齿
             "autoFrameSkip": true,
             "frameSkip": 0
         };
 
-        if (coreType === 'ps1' || coreType === 'playstation') {
-            window.EJS_biosUrl = "./bios/scph5502.bin";
-
-            window.EJS_settings = {
-                ...window.EJS_settings,
-                "pcsx_rearmed_gpu": "gpu_unai",
-                "pcsx_rearmed_resolution": 2,
-                "pcsx_rearmed_dithering": "disabled",
-                "initialMemorySize": 128,
-                "pcsx_rearmed_frameskip": 0
-            };
-
-            fetch('./bios/scph5502.bin', { method: 'HEAD' })
-                .then(response => {
-                    if (!response.ok) {
-                        window.EJS_biosUrl = "./bios/scph5501.bin";
-                    }
-                })
-                .catch(() => {
-                    window.EJS_biosUrl = "./bios/scph5501.bin";
-                });
-        }
-        else if (coreType === 'gba') {
-            window.EJS_biosUrl = "./bios/gba_bios.bin";
-            window.EJS_settings = {
-                ...window.EJS_settings,
-                "mgba_interframe_blending": false,
-                "mgba_video_color_correction": "enabled",
-                "mgba_lcd_ghosting": "disabled",
-                "mgba_fps": 60
-            };
-        }
-        else if (coreType === 'gb' || coreType === 'gbc') {
-            window.EJS_biosUrl = "./bios/gbc_bios.bin";
-            window.EJS_settings = {
-                ...window.EJS_settings,
-                "gambatte_gb_internal_palette": "optimized",
-                "gambatte_mix_frames": "disabled"
-            };
-        }
-        else if (coreType === 'segacd') {
-            window.EJS_biosUrl = "./bios/bios_CD_U.bin";
-        }
-        else if (coreType === 'saturn') {
-            window.EJS_biosUrl = "./bios/saturn_bios.bin";
-        }
-        else if (coreType === 'nds') {
-            window.EJS_biosUrl = "./bios/bios7.bin";
-            window.EJS_settings = {
-                ...window.EJS_settings,
-                "initialMemorySize": 128,
-                "melonds_fps": 60
-            };
-
-            fetch('./bios/bios7.bin', { method: 'HEAD' })
-                .then(response => {
-                    if (!response.ok) {
-                        window.EJS_biosUrl = "./bios/bios9.bin";
-                        return fetch('./bios/bios9.bin', { method: 'HEAD' });
-                    }
-                })
-                .then(response => {
-                    if (response && !response.ok) {
-                        window.EJS_biosUrl = "./bios/firmware.bin";
-                    }
-                });
-        }
-        else if (coreType === 'neogeopocket' || coreType === 'neogeopocketcolor') {
-            window.EJS_biosUrl = "./bios/Neo-Geo_Pocket_Color.bin";
-            fetch('./bios/Neo-Geo_Pocket_Color.bin', { method: 'HEAD' })
-                .then(response => {
-                    if (!response.ok) {
-                        window.EJS_biosUrl = "./bios/Neo-Geo_Pocket.bin";
-                    }
-                })
-                .catch(() => {
-                    window.EJS_biosUrl = "./bios/Neo-Geo_Pocket.bin";
-                });
-        }
-
-        // --- Arcade / FBNeo 模式修改 ---
+        // --- 街机 / FBNeo 渲染模式修改 ---
         if (coreType === 'mame' || coreType === 'fbneo' || coreType === 'arcade' || coreType === 'neogeo') {
             window.EJS_settings = {
                 ...window.EJS_settings,
                 "webgl2Enabled": "enabled",
-                "videoSmooth": true,             // 开启 Arcade 画面平滑
+                "videoSmooth": true,
                 "fbneo-neogeo-mode": "UNIBIOS",
                 "fbneo-cpu-speed-adjust": 100,
                 "fbneo-frameskip": 0,
-                "fbneo-interpolation": 1,        // 开启内部双线性插值
-                "shader": "none"                 // 禁用 sharp，恢复原汁原味平滑画质
+                "fbneo-interpolation": 1,
+                "shader": "sabr"              // 【关键】使用 SABR 矢量像素重绘滤镜（高清且不发糊）
             };
 
             window.EJS_biosUrl = "./bios/neogeo.zip";
-            console.log("NeoGeo/Arcade mode: Using neogeo.zip BIOS from", window.EJS_biosUrl);
-
             if (game && game.includes('mslug6')) {
                 window.EJS_biosUrl = "./bios/awbios.zip";
             }
