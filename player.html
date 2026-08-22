@@ -72,9 +72,9 @@
 
         window.EJS_language = 'en-US';
 
-        // 本版本只认 EJS_defaultOptions（window.EJS_settings 不会被读取）
+        // 本版本 EmulatorJS 只认 EJS_defaultOptions（EJS_settings 不会被读取）
         window.EJS_defaultOptions = {
-            "webgl2Enabled": "disabled"
+            "webgl2Enabled": "disabled"   // 强制两边使用同一套渲染核心，避免本地/GitHub 表现不一致
         };
 
         if (coreType === 'ps1' || coreType === 'playstation') {
